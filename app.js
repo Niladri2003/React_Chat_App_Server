@@ -11,7 +11,8 @@ const mongosanitize = require("express-mongo-sanitize"); // This module searches
 const bodyParser = require("body-parser"); // Node.js body parsing middleware.
 const xss = require("xss-clean"); // Node.js Connect middleware to sanitize user input coming from POST body, GET queries, and url params.
 const cors = require("cors"); // CORS is a node.js package for providing a Connect/Express middleware that can be used to enable CORS with various options.
-
+const routes = require("./routes/index");
+const app = express();
 app.use(
   cors({
     origin: "*",
@@ -22,11 +23,11 @@ app.use(
   })
 );
 
-const app = express();
 //
 app.use(express.json({ limit: "10kb" }));
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+// app.use(bodyParser.json());
+app.use(express.json());
+// app.use(bodyParser.urlencoded({ extended: true }));
 app.use(helmet());
 
 if (process.env.NODE_ENV === "dev") {
@@ -39,14 +40,14 @@ const limiter = rateLimit({
 });
 app.use("/tawk", limiter);
 
-app.use(
-  express.urlencoded({
-    extended: true,
-  })
-);
+// app.use(
+//   express.urlencoded({
+//     extended: true,
+//   })
+// );
 
-app.use(mongosanitize());
+// app.use(mongosanitize());
 
-app.use(xss());
-
+// app.use(xss());
+app.use(routes);
 module.exports = app;

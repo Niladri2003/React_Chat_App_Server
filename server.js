@@ -20,8 +20,6 @@ const DB = process.env.MOGODB_URL.replace(
 mongoose
   .connect(DB, {
     useNewUrlParser: true,
-    useCreateIndex: true,
-    useFindAndModify: false,
     useUnifiedTopology: true,
   })
   .then((con) => {
@@ -37,6 +35,12 @@ server.listen(port, () => {
   console.log(`Server is running on ${port}`);
 });
 
+app.get("/", (req, res) => {
+  return res.status(200).json({
+    status: "Success",
+    message: "Server running",
+  });
+});
 //handling some error
 process.on("unhandledRejection", (err) => {
   console.log(err);
