@@ -75,17 +75,18 @@ userSchema.pre("save", async function (next) {
 });
 
 // Password Hashing
-userSchema.pre("save", async function (next) {
-  // Only run this function if password was actually modified
-  if (!this.isModified("password") || !this.password) return next();
 
-  // Hash the password with cost of 12
-  this.password = await bcrypt.hash(this.password, 12);
+// userSchema.pre("save", async function (next) {
+//   // Only run this function if password was actually modified
+//   if (!this.isModified("password") || !this.password) return next();
 
-  //! Shift it to next hook // this.passwordChangedAt = Date.now() - 1000;
+//   // Hash the password with cost of 12
+//   this.password = await bcrypt.hash(this.password, 12);
 
-  next();
-});
+//   //! Shift it to next hook // this.passwordChangedAt = Date.now() - 1000;
+
+//   next();
+// });
 
 // Password checking
 userSchema.methods.correctPassword = async function (

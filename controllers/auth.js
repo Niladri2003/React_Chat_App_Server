@@ -7,10 +7,13 @@ const { promisify } = require("util");
 const mailSender = require("../services/mailer");
 const emailTemplate = require("../mail/otpmailtemp");
 const resetTmp = require("../mail/resetPassword");
+const catchAsync = require("../utils/catchAsync");
+const bcrypt = require("bcryptjs");
 
 const signToken = (userId) => jwt.sign({ userId }, process.env.JWT_SECRET);
+
 //Register New User
-exports.register = async (req, res, next) => {
+exports.register = catchAsync(async (req, res, next) => {
   const { firstName, lastName, email, password } = req.body;
   console.log(req.body);
   const filterdBody = filterObj(
@@ -21,6 +24,10 @@ exports.register = async (req, res, next) => {
     "email"
   );
 
+  // Password hashing
+  const HashedPassword = await bcrypt.hash(password, 12);
+  console.log("Recived data->", filterObj, "Password Hashed", HashedPassword);
+  filterdBody.password = HashedPassword;
   // Check existing user in db if their is any user with same email or not
   const existing_user = await User.findOne({ email: email });
   console.log(existing_user);
@@ -47,9 +54,9 @@ exports.register = async (req, res, next) => {
     req.user = newUser._id;
     next();
   }
-};
+});
 //send otp
-exports.sendOTP = async (req, res, next) => {
+exports.sendOTP = catchAsync(async (req, res, next) => {
   const { user } = req;
   const details = await User.findById(user);
   const new_OTP = otpgenerator.generate(6, {
@@ -76,9 +83,9 @@ exports.sendOTP = async (req, res, next) => {
     status: "success",
     message: "Otp send succesfully",
   });
-};
+});
 //veriify otp
-exports.verifyOTP = async (req, res, next) => {
+exports.verifyOTP = catchAsync(async (req, res, next) => {
   // verify OTP and update the user record
   const { email, otp } = req.body;
   // console.log("Email & otp is->", email, otp);
@@ -119,6 +126,7 @@ exports.verifyOTP = async (req, res, next) => {
       status: "error",
       message: "Otp is invalid",
     });
+    return;
   }
 
   // console.log("HEllo 2");
@@ -133,64 +141,45 @@ exports.verifyOTP = async (req, res, next) => {
     message: "Logged in succesfully",
     token,
   });
-};
+});
 //Login
-exports.login = async (req, res, next) => {
-  try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      res.status(400).json({
-        status: "error",
-        message: "Both email and password are required",
-      });
-    }
-    // finding user in db
-    const user = await User.findOne({ email: email }).select("+password");
-    console.log("Db USer", user);
-
-    if (!user || !(await user.correctPassword(password, user.password))) {
-      res.status(400).json({
-        status: "error",
-        message: "Email or password incorrect",
-      });
-    }
-
-    //password checking
-    // if (password !== user.password) {
-    //   res.status(400).json({
-    //     status: "error",
-    //     message: "Email or password incorrect",
-    //   });
-    // }
-    const token = signToken(user._id);
-    console.log(token);
-    const options = {
-      expires: new Date(Date.now() + 3 * 24 * 60 * 1000),
-      httpOnly: true,
-    };
-
-    // res.cookie("token", token, options).status(200).json({
-    //   status: "success",
-    //   token,
-    //   message: "Logged in succesfully",
-    // });
-    res.status(200).json({
-      status: "success",
-      message: "Logged in successfully!",
-      token,
-      user_id: user._id,
+exports.login = catchAsync(async (req, res, next) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    res.status(400).json({
+      status: "error",
+      message: "Both email and password are required",
     });
-  } catch (e) {
-    console.log(e);
-    // Return 500 Internal Server Error status code with error message
-    res.status(500).json({
-      success: false,
-      message: "Log in failure please try Again",
-    });
+    return;
   }
-};
+  // finding user in db
+  const user = await User.findOne({ email: email }).select("+password");
+  console.log("DB stored Password before decoding", user.password);
+  console.log("USer given password", password);
+  console.log(
+    "Comparing password",
+    await bcrypt.compare(password, user.password)
+  );
+  if (!user || !(await bcrypt.compare(password, user.password))) {
+    res.status(400).json({
+      status: "error",
+      message: "Email or password incorrect",
+    });
+    return;
+  }
+
+  const token = signToken(user._id);
+  console.log(token);
+
+  res.status(200).json({
+    status: "success",
+    message: "Logged in successfully!",
+    token,
+    user_id: user._id,
+  });
+});
 //protect route
-exports.protect = async (req, res, next) => {
+exports.protect = catchAsync(async (req, res, next) => {
   // getting a token (jwt) and then check if its actually there
   let token;
   if (
@@ -227,12 +216,12 @@ exports.protect = async (req, res, next) => {
   }
   req.user = this_user;
   next();
-};
+});
 
 //forgot password
 
 //types of routes -> protected (only logged in users can acces there) & unprotected routes
-exports.forgotPassword = async (req, res, next) => {
+exports.forgotPassword = catchAsync(async (req, res, next) => {
   // get user email
   const { email } = req.body;
   const user = await User.findOne({ email: email });
@@ -248,14 +237,14 @@ exports.forgotPassword = async (req, res, next) => {
   await user.save({ validateBeforeSave: false });
 
   console.log("token", resetToken);
-  const resetURL = `https://localhost:4000/auth/reset-password/?code=${resetToken}`;
+  const resetURL = `http://localhost:3000/auth/new-password/?code=${resetToken}`;
 
   try {
     //TODO => Send email with reset
     const mailResponse = await mailSender(
       email,
       "Password Reset email",
-      emailTemplate(user.firstName, resetURL)
+      resetTmp(user.firstName, resetURL)
     );
     console.log("Reset email response", mailResponse);
     res.status(200).json({
@@ -272,10 +261,10 @@ exports.forgotPassword = async (req, res, next) => {
       message: "There was an error sending the email. Try again later!",
     });
   }
-};
+});
 
 //reset Password
-exports.resetPassword = async (req, res, next) => {
+exports.resetPassword = catchAsync(async (req, res, next) => {
   console.log("Inside ResetPassword");
   // get the user based on token
   console.log("Recived Token", req.body.token);
@@ -295,9 +284,11 @@ exports.resetPassword = async (req, res, next) => {
       message: "Token is invalid or expired",
     });
   }
+  //Hashing password
+  const HashedPassword = await bcrypt.hash(user.password, 12);
   //update password and set reset token and expiry to unedfined
-  user.password = req.body.password;
-  user.passwordConfirm = req.body.passwordConfirm;
+  user.password = HashedPassword;
+  user.passwordConfirm = HashedPassword;
   user.passwordResetToken = undefined;
   user.passwordResetExpires = undefined;
 
@@ -312,4 +303,4 @@ exports.resetPassword = async (req, res, next) => {
     message: "Password updated succesfully",
     token,
   });
-};
+});
