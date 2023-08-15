@@ -140,6 +140,7 @@ exports.verifyOTP = catchAsync(async (req, res, next) => {
     status: "success",
     message: "Logged in succesfully",
     token,
+    user_id: user._id,
   });
 });
 //Login

@@ -59,6 +59,19 @@ const userSchema = new mongoose.Schema({
   otp_exp: {
     type: Date,
   },
+  socket_id: {
+    type: String,
+  },
+  friends: [
+    {
+      type: mongoose.Schema.ObjectId,
+      ref: "User",
+    },
+  ],
+  status: {
+    type: String,
+    enum: ["Online", "Offline"],
+  },
 });
 
 //OTP hashing and storing in db
